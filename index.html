@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0a0908" />
+  <title>De Code</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
+  <style>
+    html, body { background: #050403; margin: 0; padding: 0; }
+    body { font-family: 'EB Garamond', Georgia, serif; }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-7px); }
+      40% { transform: translateX(7px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+    .shake { animation: shake 0.45s cubic-bezier(.36,.07,.19,.97); }
+
+    @keyframes ember {
+      0%, 100% { opacity: 0.35; }
+      50% { opacity: 0.7; }
+    }
+    .ember { animation: ember 2.4s ease-in-out infinite; }
+
+    @keyframes letter-in {
+      from { opacity: 0; transform: translateY(6px) scale(0.85); filter: blur(4px); }
+      to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    }
+    .letter-in { animation: letter-in 0.5s ease-out backwards; }
+
+    @keyframes flash-in {
+      0% { opacity: 0; transform: scale(0.7); }
+      40% { opacity: 1; transform: scale(1.05); }
+      100% { opacity: 0; transform: scale(1); }
+    }
+    .flash-in { animation: flash-in 0.5s ease-out forwards; }
+
+    @keyframes border-pulse {
+      0%, 100% { border-color: rgba(140, 100, 50, 0.35); box-shadow: inset 0 4px 14px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(255, 200, 100, 0.04), 0 0 0 0 rgba(217, 119, 6, 0); }
+      50% { border-color: rgba(180, 130, 60, 0.55); box-shadow: inset 0 4px 14px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(255, 200, 100, 0.06), 0 0 32px 2px rgba(217, 119, 6, 0.12); }
+    }
+    .frame-pulse { animation: border-pulse 3.2s ease-in-out infinite; }
+
+    @keyframes lock-pulse {
+      0%, 100% { opacity: 0.55; }
+      50% { opacity: 0.95; }
+    }
+    .lock-pulse { animation: lock-pulse 1.4s ease-in-out infinite; }
+
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fade-up 0.7s ease-out backwards; }
+
+    @keyframes reveal-grand {
+      0% { opacity: 0; transform: translateY(20px) scale(0.92); filter: blur(6px); }
+      60% { transform: translateY(-3px) scale(1.02); }
+      100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+    }
+    .reveal-grand { animation: reveal-grand 1s cubic-bezier(.2,.8,.2,1) backwards; }
+
+    .grain {
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.7 0 0 0 0 0.5 0 0 0 0 0.3 0 0 0 0.4 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+    }
+
+    .display-font { font-family: 'EB Garamond', Georgia, serif; }
+    .ui-font { font-family: 'Inter', system-ui, sans-serif; }
+
+    input::selection { background: rgba(217, 119, 6, 0.3); }
+    input:focus { outline: none; }
+    input { font-size: 16px; }
+    input::placeholder { color: transparent; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useRef, useEffect, useCallback } = React;
+
+    const REWARD = `52°02'26.7"N 4°21'11.0"E`;
+
+    const CODE = [
+      { coord: [3, 5],   letter: 'B' },
+      { coord: [28, 1],  letter: 'O' },
+      { coord: [4, 1],   letter: 'W' },
+      { coord: [11, 1],  letter: 'L' },
+      { coord: [33, 1],  letter: 'I' },
+      { coord: [12, 2],  letter: 'N' },
+      { coord: [35, 3],  letter: 'G' },
+      { coord: [79, 3],  letter: 'B' },
+      { coord: [26, 1],  letter: 'A' },
+      { coord: [100, 2], letter: 'A' },
+      { coord: [51, 3],  letter: 'N' }
+    ];
+
+    const WRONG_LIMIT     = 5;
+    const WRONG_WINDOW_MS = 15000;
+    const TIMEOUT_MS      = 20000;
+
+    function Decoder() {
+      const [step, setStep] = useState(0);
+      const [shake, setShake] = useState(false);
+      const [recent, setRecent] = useState(null);
+      const [copied, setCopied] = useState(false);
+
+      const [wrongTimes, setWrongTimes] = useState([]);
+      const [lockUntil, setLockUntil] = useState(0);
+      const [, setTick] = useState(0);
+
+      const inputRef = useRef(null);
+      const total = CODE.length;
+      const isComplete = step >= total;
+
+      const now = Date.now();
+      const isLocked = lockUntil > now;
+      const secondsLeft = Math.max(0, Math.ceil((lockUntil - now) / 1000));
+
+      useEffect(() => {
+        if (lockUntil === 0) return;
+        const interval = setInterval(() => setTick(t => t + 1), 150);
+        return () => clearInterval(interval);
+      }, [lockUntil]);
+
+      useEffect(() => {
+        if (lockUntil > 0 && now >= lockUntil) {
+          setLockUntil(0);
+          setWrongTimes([]);
+          setRecent(null);
+        }
+      }, [now, lockUntil]);
+
+      useEffect(() => {
+        if (isComplete || isLocked) return;
+        const refocus = (e) => {
+          if (e?.target?.tagName === 'BUTTON' || e?.target?.tagName === 'A') return;
+          inputRef.current?.focus();
+        };
+        refocus();
+        document.addEventListener('touchstart', refocus);
+        document.addEventListener('click', refocus);
+        return () => {
+          document.removeEventListener('touchstart', refocus);
+          document.removeEventListener('click', refocus);
+        };
+      }, [isComplete, isLocked]);
+
+      const handleLetter = useCallback((raw) => {
+        if (!raw || isComplete || isLocked) return;
+        const letter = raw.toUpperCase().slice(-1);
+        if (!/[A-Z]/.test(letter)) return;
+
+        const t = Date.now();
+        const key = t;
+
+        if (CODE[step].letter === letter) {
+          setRecent({ letter, status: 'correct', key });
+          setStep(s => s + 1);
+          if (navigator.vibrate) navigator.vibrate(10);
+          setTimeout(() => {
+            setRecent(prev => (prev?.key === key ? null : prev));
+          }, 450);
+        } else {
+          const recentWrong = wrongTimes.filter(ts => t - ts < WRONG_WINDOW_MS);
+          const updated = [...recentWrong, t];
+
+          if (updated.length >= WRONG_LIMIT) {
+            setWrongTimes([]);
+            setLockUntil(t + TIMEOUT_MS);
+            setRecent(null);
+            setShake(true);
+            if (navigator.vibrate) navigator.vibrate([60, 50, 60, 50, 120]);
+            setTimeout(() => setShake(false), 500);
+          } else {
+            setWrongTimes(updated);
+            setRecent({ letter, status: 'wrong', key });
+            setShake(true);
+            if (navigator.vibrate) navigator.vibrate([30, 40, 30]);
+            setTimeout(() => {
+              setShake(false);
+              setRecent(prev => (prev?.key === key ? null : prev));
+            }, 500);
+          }
+        }
+      }, [step, isComplete, isLocked, wrongTimes]);
+
+      const handleCopy = async () => {
+        try {
+          await navigator.clipboard.writeText(REWARD);
+          setCopied(true);
+          if (navigator.vibrate) navigator.vibrate(10);
+          setTimeout(() => setCopied(false), 1800);
+        } catch (e) {}
+      };
+
+      return (
+        <div
+          className="min-h-screen w-full text-stone-100 antialiased relative overflow-hidden flex flex-col"
+          style={{
+            background: 'radial-gradient(ellipse at top, #1c1815 0%, #0a0908 60%, #050403 100%)',
+            fontFamily: "'EB Garamond', Georgia, serif",
+          }}
+        >
+          <div className="grain fixed inset-0 pointer-events-none opacity-[0.07] mix-blend-overlay" />
+          <div
+            className="fixed inset-0 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.7) 100%)' }}
+          />
+
+          <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-10 max-w-md mx-auto w-full">
+
+            <div className="fade-up mb-12 text-center">
+              <p className="ui-font text-[9px] tracking-[0.5em] text-amber-700/80 uppercase">
+                — de code —
+              </p>
+            </div>
+
+            <div
+              key={step}
+              className={`fade-up mb-14 ${shake ? 'shake' : ''}`}
+              style={{ animationDelay: '0.15s' }}
+            >
+              <div className="flex justify-center items-center flex-wrap gap-x-1">
+                {CODE.map((entry, i) => {
+                  const revealed = i < step;
+                  const isCurrent = i === step;
+                  return (
+                    <span
+                      key={i}
+                      className={`display-font inline-block text-center transition-all duration-700 ${
+                        revealed
+                          ? 'text-amber-200 letter-in'
+                          : isCurrent && !isLocked
+                          ? 'text-amber-700/40 ember'
+                          : 'text-stone-700/60'
+                      }`}
+                      style={{
+                        width: '1.05em',
+                        fontSize: '32px',
+                        letterSpacing: '0.05em',
+                        textShadow: revealed ? '0 0 18px rgba(251, 191, 36, 0.4)' : 'none',
+                      }}
+                    >
+                      {revealed ? entry.letter : '·'}
+                    </span>
+                  );
+                })}
+              </div>
+
+              <div className="mt-5 flex items-center justify-center gap-3">
+                <div className="h-px w-8 bg-stone-800" />
+                <span className="ui-font text-[10px] tracking-[0.3em] text-stone-500 tabular-nums uppercase">
+                  {isComplete ? 'voltooid' : `${String(step).padStart(2, '0')} / ${total}`}
+                </span>
+                <div className="h-px w-8 bg-stone-800" />
+              </div>
+            </div>
+
+            {isComplete ? (
+              <div className="reveal-grand flex flex-col items-center gap-6">
+                <p className="display-font italic text-amber-300/70 text-sm tracking-[0.2em]">
+                  de coördinaten
+                </p>
+
+                <div
+                  className="relative px-7 py-6"
+                  style={{
+                    background: 'linear-gradient(180deg, rgba(60, 40, 15, 0.4) 0%, rgba(30, 20, 10, 0.5) 100%)',
+                    border: '1px solid rgba(217, 160, 80, 0.55)',
+                    borderRadius: '3px',
+                    boxShadow: 'inset 0 0 32px rgba(0,0,0,0.4), 0 0 40px rgba(217, 119, 6, 0.12)',
+                  }}
+                >
+                  <span className="absolute -top-2 -left-2 w-3 h-3 border-l border-t border-amber-500/70" />
+                  <span className="absolute -top-2 -right-2 w-3 h-3 border-r border-t border-amber-500/70" />
+                  <span className="absolute -bottom-2 -left-2 w-3 h-3 border-l border-b border-amber-500/70" />
+                  <span className="absolute -bottom-2 -right-2 w-3 h-3 border-r border-b border-amber-500/70" />
+
+                  <div className="display-font text-amber-200 text-center" style={{ textShadow: '0 0 20px rgba(251, 191, 36, 0.35)' }}>
+                    {REWARD.split(' ').map((part, i) => (
+                      <p
+                        key={i}
+                        className="leading-relaxed"
+                        style={{ fontSize: '22px', letterSpacing: '0.04em', fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {part}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleCopy}
+                  className="ui-font text-[11px] tracking-[0.3em] uppercase px-4 py-2 border border-amber-800/50 text-amber-300/80 hover:text-amber-200 hover:border-amber-600/70 active:scale-95 transition-all"
+                  style={{ borderRadius: '2px', minHeight: '36px' }}
+                >
+                  {copied ? '✓ gekopieerd' : 'kopieer'}
+                </button>
+              </div>
+            ) : isLocked ? (
+              <div className="flex flex-col items-center gap-5">
+                <div className="fade-up relative" style={{ width: '152px', height: '152px' }}>
+                  <span className="absolute -top-2 -left-2 w-3 h-3 border-l border-t border-red-900/60" />
+                  <span className="absolute -top-2 -right-2 w-3 h-3 border-r border-t border-red-900/60" />
+                  <span className="absolute -bottom-2 -left-2 w-3 h-3 border-l border-b border-red-900/60" />
+                  <span className="absolute -bottom-2 -right-2 w-3 h-3 border-r border-b border-red-900/60" />
+
+                  <div
+                    className="absolute inset-0 flex items-center justify-center"
+                    style={{
+                      background: 'radial-gradient(ellipse at center, #100806 0%, #15100d 60%, #1a1310 100%)',
+                      border: '1px solid rgba(150, 60, 50, 0.45)',
+                      borderRadius: '3px',
+                      boxShadow: 'inset 0 4px 14px rgba(0,0,0,0.6), 0 0 28px rgba(150, 50, 40, 0.12)',
+                    }}
+                  >
+                    <div
+                      className="absolute inset-1 pointer-events-none"
+                      style={{ borderRadius: '2px', boxShadow: 'inset 0 0 28px rgba(0,0,0,0.55)' }}
+                    />
+
+                    <span
+                      className="display-font lock-pulse tabular-nums"
+                      style={{
+                        fontSize: '64px',
+                        color: '#c87a72',
+                        textShadow: '0 0 24px rgba(180, 80, 70, 0.35)',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {secondsLeft}
+                    </span>
+                  </div>
+                </div>
+
+                <p className="ui-font text-[10px] tracking-[0.3em] text-red-400/50 uppercase">
+                  te veel pogingen
+                </p>
+              </div>
+            ) : (
+              <div
+                className="fade-up relative"
+                style={{ animationDelay: '0.3s', width: '152px', height: '152px' }}
+                onClick={() => inputRef.current?.focus()}
+              >
+                <span className="absolute -top-2 -left-2 w-3 h-3 border-l border-t border-amber-700/60" />
+                <span className="absolute -top-2 -right-2 w-3 h-3 border-r border-t border-amber-700/60" />
+                <span className="absolute -bottom-2 -left-2 w-3 h-3 border-l border-b border-amber-700/60" />
+                <span className="absolute -bottom-2 -right-2 w-3 h-3 border-r border-b border-amber-700/60" />
+
+                <div
+                  className={`absolute inset-0 flex items-center justify-center transition-colors duration-300 ${
+                    recent?.status === 'wrong' ? '' : 'frame-pulse'
+                  }`}
+                  style={{
+                    background: 'radial-gradient(ellipse at center, #0c0a08 0%, #14110d 60%, #1a1611 100%)',
+                    border: '1px solid',
+                    borderColor:
+                      recent?.status === 'wrong'
+                        ? 'rgba(185, 75, 60, 0.7)'
+                        : recent?.status === 'correct'
+                        ? 'rgba(217, 160, 80, 0.65)'
+                        : undefined,
+                    borderRadius: '3px',
+                    boxShadow:
+                      recent?.status === 'wrong'
+                        ? 'inset 0 4px 14px rgba(0,0,0,0.55), 0 0 28px rgba(185, 75, 60, 0.18)'
+                        : undefined,
+                  }}
+                >
+                  <div
+                    className="absolute inset-1 pointer-events-none"
+                    style={{ borderRadius: '2px', boxShadow: 'inset 0 0 24px rgba(0,0,0,0.5)' }}
+                  />
+
+                  <div className="display-font relative" style={{ lineHeight: 1 }}>
+                    {recent ? (
+                      <span
+                        key={recent.key}
+                        className="flash-in inline-block"
+                        style={{
+                          fontSize: '78px',
+                          color: recent.status === 'correct' ? '#fcd34d' : '#e07a6e',
+                          textShadow:
+                            recent.status === 'correct'
+                              ? '0 0 32px rgba(251, 191, 36, 0.6), 0 0 12px rgba(251, 191, 36, 0.4)'
+                              : '0 0 24px rgba(220, 80, 70, 0.5)',
+                        }}
+                      >
+                        {recent.letter}
+                      </span>
+                    ) : (
+                      <span
+                        className="ember inline-block"
+                        style={{
+                          fontSize: '40px',
+                          color: 'rgba(180, 130, 60, 0.4)',
+                          letterSpacing: '0.1em',
+                        }}
+                      >
+                        ·
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <input
+                  ref={inputRef}
+                  type="text"
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  maxLength={1}
+                  value=""
+                  onChange={(e) => handleLetter(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key.length === 1 && /[a-zA-Z]/.test(e.key)) {
+                      handleLetter(e.key);
+                      e.preventDefault();
+                    }
+                  }}
+                  autoFocus
+                  aria-label="Voer letter in"
+                  className="absolute inset-0 w-full h-full bg-transparent border-0 text-transparent caret-transparent cursor-text"
+                  style={{
+                    fontSize: '16px',
+                    WebkitTapHighlightColor: 'transparent',
+                    WebkitAppearance: 'none',
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<Decoder />);
+  </script>
+</body>
+</html>
